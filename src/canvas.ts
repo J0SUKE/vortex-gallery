@@ -6,6 +6,7 @@ import GUI from "lil-gui"
 import vertexShader from "./shaders/vertex.glsl"
 import fragmentShader from "./shaders/fragment.glsl"
 import Gallery from "./gallery"
+import normalizeWheel from "normalize-wheel"
 
 export default class Canvas {
   element: HTMLCanvasElement
@@ -21,17 +22,19 @@ export default class Canvas {
   orbitControls: OrbitControls
   debug: GUI
   gallery: Gallery
+  scrollY: number
 
   constructor() {
     this.element = document.getElementById("webgl") as HTMLCanvasElement
     this.time = 0
+    this.scrollY = 0
     this.createClock()
     this.createScene()
     this.createCamera()
     this.createRenderer()
     this.setSizes()
     this.createRayCaster()
-    this.createOrbitControls()
+    //this.createOrbitControls()
     this.addEventListeners()
     this.createDebug()
     this.createGallery()
@@ -51,7 +54,7 @@ export default class Canvas {
       100
     )
     this.scene.add(this.camera)
-    this.camera.position.z = 3
+    this.camera.position.z = 30
   }
 
   createOrbitControls() {
@@ -117,6 +120,7 @@ export default class Canvas {
   addEventListeners() {
     window.addEventListener("mousemove", this.onMouseMove.bind(this))
     window.addEventListener("resize", this.onResize.bind(this))
+    window.addEventListener("wheel", this.onWheel.bind(this))
   }
 
   onResize() {
@@ -135,7 +139,10 @@ export default class Canvas {
   }
 
   createGallery() {
-    this.gallery = new Gallery({ scene: this.scene })
+    this.gallery = new Gallery({
+      scene: this.scene,
+      cameraZ: this.camera.position.z,
+    })
   }
 
   createHelpers() {
@@ -143,10 +150,19 @@ export default class Canvas {
     this.scene.add(axesHelper)
   }
 
+  onWheel(event: MouseEvent) {
+    const normalizedWheel = normalizeWheel(event)
+    this.scrollY +=
+      (-normalizedWheel.pixelY * this.sizes.height) / window.innerHeight
+
+    this.gallery.updateScroll(this.scrollY)
+  }
+
   render() {
     this.time = this.clock.getElapsedTime()
 
-    this.orbitControls.update()
+    //this.orbitControls.update()
+    this.gallery.render(this.time)
 
     this.renderer.render(this.scene, this.camera)
   }

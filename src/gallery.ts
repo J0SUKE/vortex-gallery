@@ -6,118 +6,243 @@ import { VertexNormalsHelper } from "three/addons/helpers/VertexNormalsHelper.js
 
 interface Props {
   scene: THREE.Scene
+  cameraZ: number
+}
+
+interface ImageInfo {
+  width: number
+  height: number
+  aspectRatio: number
+  uvs: {
+    xStart: number
+    xEnd: number
+    yStart: number
+    yEnd: number
+  }
 }
 
 export default class Gallery {
   scene: THREE.Scene
+  instancedMaterial: THREE.ShaderMaterial
+  imageInfos: ImageInfo[] = []
+  atlasTexture: THREE.Texture | null = null
+  scrollY: number
+  cameraZ: number
 
-  constructor({ scene }: Props) {
+  constructor({ scene, cameraZ }: Props) {
     this.scene = scene
+    this.scrollY = 0
+    this.cameraZ = cameraZ
 
-    this.createInstancedMesh()
+    this.loadTextureAtlas().then(() => {
+      this.createInstancedMesh()
+    })
     //this.createDebugMesh()
   }
 
+  async loadTextureAtlas() {
+    // Define your image paths
+    const imagePaths = [
+      "/frames/f1.jpg",
+      "/frames/f2.jpg",
+      "/frames/f3.jpg",
+      "/frames/f4.jpg",
+      "/frames/f5.jpg",
+      "/frames/f6.jpg",
+      "/frames/f7.jpg",
+      "/frames/f8.jpg",
+    ]
+
+    // Load all images first to get their dimensions
+    const imagePromises = imagePaths.map((path) => {
+      return new Promise<HTMLImageElement>((resolve) => {
+        const img = new Image()
+        img.onload = () => resolve(img)
+        img.src = path
+      })
+    })
+
+    const images = await Promise.all(imagePromises)
+
+    await new Promise<HTMLImageElement>((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        images.push(img)
+        resolve(img)
+      }
+      img.src = "/black.png"
+    })
+
+    // Calculate atlas dimensions (for simplicity, we'll stack images vertically)
+    let atlasHeight = 0
+    const atlasWidth = Math.max(...images.map((img) => img.width))
+
+    // First pass: calculate total height and store image info
+    images.forEach((img) => {
+      const aspectRatio = img.width / img.height
+
+      this.imageInfos.push({
+        width: img.width,
+        height: img.height,
+        aspectRatio,
+        uvs: {
+          xStart: 0,
+          xEnd: img.width / atlasWidth,
+          yStart: atlasHeight,
+          yEnd: atlasHeight + img.height,
+        },
+      })
+
+      atlasHeight += img.height
+    })
+
+    // Create canvas for the atlas
+    const canvas = document.createElement("canvas")
+    canvas.width = atlasWidth
+    canvas.height = atlasHeight
+    const ctx = canvas.getContext("2d")!
+
+    // Draw images to canvas
+    let currentY = 0
+    images.forEach((img, index) => {
+      ctx.drawImage(img, 0, currentY)
+
+      // Update UVs with normalized coordinates
+      this.imageInfos[index].uvs.yStart = currentY / atlasHeight
+      this.imageInfos[index].uvs.yEnd = (currentY + img.height) / atlasHeight
+
+      currentY += img.height
+    })
+
+    // Create texture from canvas
+    this.atlasTexture = new THREE.Texture(canvas)
+    this.atlasTexture.needsUpdate = true
+  }
+
   createInstancedMesh() {
-    const geometry = new THREE.PlaneGeometry(1, 1)
-    const instancedMaterial = new THREE.ShaderMaterial({
+    const geometry = new THREE.PlaneGeometry(1.3, 1.3)
+    this.instancedMaterial = new THREE.ShaderMaterial({
       vertexShader,
       fragmentShader,
       side: THREE.DoubleSide,
+      //transparent: true,
+      uniforms: {
+        uTime: new THREE.Uniform(0),
+        uAtlas: new THREE.Uniform(this.atlasTexture),
+        uScrollY: new THREE.Uniform(this.scrollY),
+        uMaxZ: new THREE.Uniform(this.cameraZ),
+        uImageData: new THREE.Uniform(
+          this.imageInfos
+            .map((info) => [
+              info.uvs.xStart,
+              info.uvs.xEnd,
+              info.uvs.yStart,
+              info.uvs.yEnd,
+              info.aspectRatio,
+            ])
+            .flat()
+        ),
+      },
     })
 
-    const RADIUS = 5
-    const HEIGHT = 30
-    const COUNT = 200
-    const PLANESCOUNTPERCIRCLE = 20
+    const RADIUS = 4
+    const HEIGHT = 120
+    const COUNT = 600
+    const BGCOUNT = 3000
 
     const instancedMesh = new THREE.InstancedMesh(
       geometry,
-      instancedMaterial,
-      COUNT
+      this.instancedMaterial,
+      COUNT + BGCOUNT
     )
 
     // Custom buffers for per-instance attributes
-    const cylinderPositionArray = new Float32Array(COUNT * 3)
-
-    // Populate instance attributes
-    const matrix = new THREE.Matrix4()
+    const aAngles = new Float32Array(COUNT + BGCOUNT)
+    const aHeights = new Float32Array(COUNT + BGCOUNT)
+    const aRadiuses = new Float32Array(COUNT + BGCOUNT)
+    const aImageIndices = new Float32Array(COUNT + BGCOUNT)
+    const aAspectRatios = new Float32Array(COUNT + BGCOUNT)
+    const aAlphas = new Float32Array(COUNT + BGCOUNT)
+    const aSpeeds = new Float32Array(COUNT + BGCOUNT)
 
     for (let i = 0; i < COUNT; i++) {
       const angle = (i / COUNT) * Math.PI * 2
-      //j = (i / COUNT) * -HEIGHT/2
+      const imageIndex = Math.floor(
+        Math.random() * (this.imageInfos.length - 1)
+      )
 
-      // Cylindrical coordinate conversion
-      cylinderPositionArray[i * 3] = Math.cos(angle) * RADIUS
-      cylinderPositionArray[i * 3 + 1] = Math.sin(angle) * RADIUS
-      cylinderPositionArray[i * 3 + 2] = (Math.random() - 0.5) * HEIGHT
+      aAngles[i] = angle
+      aHeights[i] = (Math.random() - 0.5) * HEIGHT
+      aRadiuses[i] = Math.random() * 7 + RADIUS
 
-      //   const quaternion = new THREE.Quaternion()
-      //   quaternion.setFromAxisAngle(
-      //     new THREE.Vector3(0, 0, 1),
-      //     (3 * Math.PI) / 2 + angle
-      //   )
+      aImageIndices[i] = imageIndex
+      aAspectRatios[i] = this.imageInfos[imageIndex].aspectRatio
+      aAlphas[i] = 1
+      aSpeeds[i] = 0.2
+    }
 
-      //   const internalRotation = new THREE.Quaternion()
-      //   internalRotation.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2)
-      //   quaternion.multiply(internalRotation)
+    const MIN_RADIUS = RADIUS + 7
+    const MAX_RADIUS = RADIUS + 37
 
-      //   matrix.compose(
-      //     new THREE.Vector3(
-      //       cylinderPositionArray[i * 3],
-      //       cylinderPositionArray[i * 3 + 1],
-      //       cylinderPositionArray[i * 3 + 2]
-      //     ),
-      //     quaternion,
-      //     new THREE.Vector3(1, 1, 1)
-      //   )
+    for (let i = COUNT; i < COUNT + BGCOUNT; i++) {
+      const angle = ((i - COUNT) / BGCOUNT) * Math.PI * 2
+      const imageIndex = this.imageInfos.length - 1
 
-      //   instancedMesh.setMatrixAt(i, matrix)
+      aAngles[i] = angle
+      aHeights[i] = (Math.random() - 0.5) * HEIGHT
+      aRadiuses[i] = Math.random() * 30 + RADIUS + 7
+
+      aImageIndices[i] = imageIndex
+      aAlphas[i] =
+        (1 - (aRadiuses[i] - MIN_RADIUS) / (MAX_RADIUS - MIN_RADIUS)) * 0.6
+
+      aSpeeds[i] = Math.random() * 0.1 + 0.1
     }
 
     // Add custom attributes to geometry
     instancedMesh.geometry.setAttribute(
-      "aInstancePosition",
-      new THREE.InstancedBufferAttribute(cylinderPositionArray, 3)
+      "aImageIndex",
+      new THREE.InstancedBufferAttribute(aImageIndices, 1)
+    )
+
+    instancedMesh.geometry.setAttribute(
+      "aAngle",
+      new THREE.InstancedBufferAttribute(aAngles, 1)
+    )
+
+    instancedMesh.geometry.setAttribute(
+      "aHeight",
+      new THREE.InstancedBufferAttribute(aHeights, 1)
+    )
+
+    instancedMesh.geometry.setAttribute(
+      "aRadius",
+      new THREE.InstancedBufferAttribute(aRadiuses, 1)
+    )
+    instancedMesh.geometry.setAttribute(
+      "aAspectRatio",
+      new THREE.InstancedBufferAttribute(aAspectRatios, 1)
+    )
+    instancedMesh.geometry.setAttribute(
+      "aAlpha",
+      new THREE.InstancedBufferAttribute(aAlphas, 1)
+    )
+    instancedMesh.geometry.setAttribute(
+      "aSpeed",
+      new THREE.InstancedBufferAttribute(aSpeeds, 1)
     )
 
     this.scene.add(instancedMesh)
   }
 
-  createDebugMesh() {
-    const geometry = new THREE.PlaneGeometry(1, 1)
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xff0000,
-      side: THREE.DoubleSide,
-    })
-    const mesh = new THREE.Mesh(geometry, material)
+  updateScroll(scrollY: number) {
+    this.scrollY = scrollY
+  }
 
-    const angle = Math.PI / 4
-
-    mesh.position.x = Math.cos(angle) * Math.sqrt(2)
-    mesh.position.y = Math.sin(angle) * Math.sqrt(2)
-    mesh.position.z = 0
-
-    // Assume initial plane normal is (0,0,1)
-    const initialNormal = new THREE.Vector3(0, 0, 1)
-    const targetNormal = new THREE.Vector3(
-      -mesh.position.x,
-      -mesh.position.y,
-      0
-    ).normalize()
-
-    // Create a quaternion to rotate from initial to target normal
-    const quaternion = new THREE.Quaternion().setFromUnitVectors(
-      initialNormal,
-      targetNormal
-    )
-
-    // Apply the rotation to your plane
-    mesh.quaternion.copy(quaternion)
-
-    const helper = new VertexNormalsHelper(mesh, 1, 0xffffff)
-
-    this.scene.add(mesh)
-    this.scene.add(helper)
+  render(time: number) {
+    if (this.instancedMaterial) {
+      this.instancedMaterial.uniforms.uTime.value = time
+      this.instancedMaterial.uniforms.uScrollY.value = this.scrollY
+    }
   }
 }
