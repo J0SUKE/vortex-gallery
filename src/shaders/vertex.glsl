@@ -17,6 +17,7 @@ attribute float aSpeed;
 varying float vAlpha;
 
 uniform float uMaxZ;
+uniform float uZrange;
 
 
 vec4 getQuaternionFromAxisAngle(vec3 axis, float angle)
@@ -43,8 +44,8 @@ void main() {
     // }
 
     float zPos = aHeight + uScrollY;
-    float zRange = 120.; 
-    float minZ = (uMaxZ - 120.); // Min z position
+    float zRange = uZrange; 
+    float minZ = (uMaxZ - uZrange); // Min z position
     // Wrap around the z position
     zPos = mod(zPos - minZ, zRange) + minZ;
 

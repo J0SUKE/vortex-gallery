@@ -3,6 +3,7 @@ import * as THREE from "three"
 import vertexShader from "./shaders/vertex.glsl"
 import fragmentShader from "./shaders/fragment.glsl"
 import { VertexNormalsHelper } from "three/addons/helpers/VertexNormalsHelper.js"
+import gsap from "gsap"
 
 interface Props {
   scene: THREE.Scene
@@ -26,12 +27,18 @@ export default class Gallery {
   instancedMaterial: THREE.ShaderMaterial
   imageInfos: ImageInfo[] = []
   atlasTexture: THREE.Texture | null = null
-  scrollY: number
+  scrollY: {
+    target: number
+    current: number
+  }
   cameraZ: number
 
   constructor({ scene, cameraZ }: Props) {
     this.scene = scene
-    this.scrollY = 0
+    this.scrollY = {
+      target: 0,
+      current: 0,
+    }
     this.cameraZ = cameraZ
 
     this.loadTextureAtlas().then(() => {
@@ -121,6 +128,12 @@ export default class Gallery {
 
   createInstancedMesh() {
     const geometry = new THREE.PlaneGeometry(1.3, 1.3)
+
+    const RADIUS = 4
+    const HEIGHT = 120
+    const COUNT = 600
+    const BGCOUNT = 3000
+
     this.instancedMaterial = new THREE.ShaderMaterial({
       vertexShader,
       fragmentShader,
@@ -131,6 +144,7 @@ export default class Gallery {
         uAtlas: new THREE.Uniform(this.atlasTexture),
         uScrollY: new THREE.Uniform(this.scrollY),
         uMaxZ: new THREE.Uniform(this.cameraZ),
+        uZrange: new THREE.Uniform(HEIGHT),
         uImageData: new THREE.Uniform(
           this.imageInfos
             .map((info) => [
@@ -144,11 +158,6 @@ export default class Gallery {
         ),
       },
     })
-
-    const RADIUS = 4
-    const HEIGHT = 120
-    const COUNT = 600
-    const BGCOUNT = 3000
 
     const instancedMesh = new THREE.InstancedMesh(
       geometry,
@@ -236,13 +245,20 @@ export default class Gallery {
   }
 
   updateScroll(scrollY: number) {
-    this.scrollY = scrollY
+    this.scrollY.target = scrollY
   }
 
   render(time: number) {
     if (this.instancedMaterial) {
       this.instancedMaterial.uniforms.uTime.value = time
-      this.instancedMaterial.uniforms.uScrollY.value = this.scrollY
+
+      this.scrollY.current = gsap.utils.interpolate(
+        this.scrollY.current,
+        this.scrollY.target,
+        0.1
+      )
+
+      this.instancedMaterial.uniforms.uScrollY.value = this.scrollY.current
     }
   }
 }
