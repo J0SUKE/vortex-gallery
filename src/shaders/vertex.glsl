@@ -3,21 +3,23 @@
 attribute float aAngle;
 attribute float aHeight;
 attribute float aRadius;
-uniform float uTime;
-uniform float uScrollY;
-
-varying vec2 vUv;
-
-attribute float aImageIndex;
-varying float vImageIndex;
 attribute float aAspectRatio;
 attribute float aAlpha;
 attribute float aSpeed;
+attribute vec4 aTextureCoords;
+attribute vec2 aImageRes;
 
 varying float vAlpha;
+varying vec4 vTextureCoords;
+varying vec2 vUv;
+varying float vImageIndex;
+varying float vAspectRatio;
+varying float vOpacity;
 
 uniform float uMaxZ;
 uniform float uZrange;
+uniform float uTime;
+uniform float uScrollY;
 
 
 vec4 getQuaternionFromAxisAngle(vec3 axis, float angle)
@@ -33,21 +35,20 @@ vec4 multiplyQuaternions(vec4 q1, vec4 q2) {
     );
 }
 
-
 void main() {
-    vec3 scaledPosition = position;     
+    vec3 scaledPosition = position;
 
-    // if (aAspectRatio > 1.0) {
-    //     scaledPosition.y /= aAspectRatio;
-    // } else {
-    //     scaledPosition.x *= aAspectRatio;
-    // }
+    scaledPosition.y/=aAspectRatio;
 
     float zPos = aHeight + uScrollY;
     float zRange = uZrange; 
     float minZ = (uMaxZ - uZrange); // Min z position
     // Wrap around the z position
     zPos = mod(zPos - minZ, zRange) + minZ;
+
+    vOpacity = smoothstep(minZ,minZ+40.,zPos);
+
+
 
     vec3 instancePosition = vec3(cos(aAngle + uTime*aSpeed) * aRadius, sin(aAngle + uTime*aSpeed) * aRadius, zPos);
 
@@ -78,6 +79,7 @@ void main() {
     gl_Position = projectionMatrix * viewPosition;  
 
     vUv=uv;
-    vImageIndex = aImageIndex;
     vAlpha=aAlpha;
+    vTextureCoords = aTextureCoords;
+    vAspectRatio = aAspectRatio;
 }

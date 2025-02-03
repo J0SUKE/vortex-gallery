@@ -38,7 +38,7 @@ export default class Canvas {
     this.addEventListeners()
     this.createDebug()
     this.createGallery()
-    this.createHelpers()
+    //this.createHelpers()
     this.render()
   }
 
@@ -51,7 +51,7 @@ export default class Canvas {
       50,
       window.innerWidth / window.innerHeight,
       0.1,
-      100
+      200
     )
     this.scene.add(this.camera)
     this.camera.position.z = 30
@@ -152,16 +152,18 @@ export default class Canvas {
 
   onWheel(event: MouseEvent) {
     const normalizedWheel = normalizeWheel(event)
-    this.scrollY +=
-      (-normalizedWheel.pixelY * this.sizes.height) / window.innerHeight
+    // this.scrollY +=
+    //   (normalizedWheel.pixelY * this.sizes.height) / window.innerHeight
 
-    this.gallery.updateScroll(this.scrollY)
+    this.gallery.updateScroll(
+      (normalizedWheel.pixelY * this.sizes.height) / window.innerHeight
+    )
   }
 
   render() {
     this.time = this.clock.getElapsedTime()
 
-    //this.orbitControls.update()
+    this.orbitControls?.update()
     this.gallery.render(this.time)
 
     this.renderer.render(this.scene, this.camera)
