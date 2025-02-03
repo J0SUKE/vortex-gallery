@@ -40,6 +40,7 @@ export default class Canvas {
     this.createGallery()
     //this.createHelpers()
     this.render()
+    this.debug.hide()
   }
 
   createScene() {
