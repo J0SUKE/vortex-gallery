@@ -23,6 +23,7 @@ export default class Canvas {
   debug: GUI
   gallery: Gallery
   scrollY: number
+  lastDirection: number = 1
 
   constructor() {
     this.element = document.getElementById("webgl") as HTMLCanvasElement
@@ -55,7 +56,7 @@ export default class Canvas {
       200
     )
     this.scene.add(this.camera)
-    this.camera.position.z = 30
+    this.camera.position.z = 5
   }
 
   createOrbitControls() {
@@ -151,13 +152,23 @@ export default class Canvas {
     this.scene.add(axesHelper)
   }
 
-  onWheel(event: MouseEvent) {
+  onWheel(event: WheelEvent) {
+    //console.log(event.deltaY)
+
     const normalizedWheel = normalizeWheel(event)
-    // this.scrollY +=
-    //   (normalizedWheel.pixelY * this.sizes.height) / window.innerHeight
+
+    const delta = event.deltaY
+    let value = Math.sign(event.deltaY)
+
+    if (delta === 0) {
+      value = this.lastDirection
+    } else {
+      this.lastDirection = value
+    }
 
     this.gallery.updateScroll(
-      (normalizedWheel.pixelY * this.sizes.height) / window.innerHeight
+      (normalizedWheel.pixelY * this.sizes.height) / window.innerHeight,
+      this.lastDirection
     )
   }
 

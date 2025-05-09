@@ -133,3 +133,19 @@ body {
   top: 0;
   left: 0;
 }
+#app {
+  position: relative;
+  pointer-events: none;
+  width: 100%;
+  height: 100dvh;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.container {
+  width: 25vmax;
+  height: 30vmax;
+  background: purple;
+}
