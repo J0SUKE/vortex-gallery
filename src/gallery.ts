@@ -290,8 +290,8 @@ export default class Gallery {
       this.scrollY.target += 0.015 * this.scrollY.direction
       this.scrollY.speedTarget += 0.015 * this.scrollY.direction
 
-      this.textureIndex = Math.floor(
-        this.scrollY.speedTarget % this.imageInfos.length
+      this.textureIndex = Math.abs(
+        Math.floor(this.scrollY.speedTarget % (this.imageInfos.length - 1))
       )
 
       this.material.uniforms.uTextureCoords.value.set(
