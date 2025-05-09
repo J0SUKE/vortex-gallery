@@ -4,22 +4,22 @@ attribute float aAngle;
 attribute float aHeight;
 attribute float aRadius;
 attribute float aAspectRatio;
-attribute float aAlpha;
 attribute float aSpeed;
 attribute vec4 aTextureCoords;
 attribute vec2 aImageRes;
 
-varying float vAlpha;
+
 varying vec4 vTextureCoords;
 varying vec2 vUv;
 varying float vImageIndex;
 varying float vAspectRatio;
-varying float vOpacity;
 
 uniform float uMaxZ;
 uniform float uZrange;
 uniform float uTime;
 uniform float uScrollY;
+uniform float uSpeedY;
+uniform float uDirection;
 
 
 vec4 getQuaternionFromAxisAngle(vec3 axis, float angle)
@@ -43,34 +43,27 @@ void main() {
     float zPos = aHeight + uScrollY;
     float zRange = uZrange; 
     float minZ = (uMaxZ - uZrange); // Min z position
-    // Wrap around the z position
+    // // Wrap around the z position
     zPos = mod(zPos - minZ, zRange) + minZ;
 
-    vOpacity = smoothstep(minZ,minZ+40.,zPos);
 
 
-
-    vec3 instancePosition = vec3(cos(aAngle + uTime*aSpeed) * aRadius, sin(aAngle + uTime*aSpeed) * aRadius, zPos);
+    float theta = aAngle + uSpeedY*0.4*aSpeed;
+    
+    vec3 instancePosition = vec3(cos(theta) * aRadius, zPos, sin(theta) * aRadius);
 
     // Compute angle from instance position
-    float angle = atan(instancePosition.y, instancePosition.x);
+    float angle = atan(instancePosition.x, instancePosition.z);    
 
-    // Quaternion representation: q = (cos(theta/2), sin(theta/2) * axis)
-    float halfAngle = 1.5 * PI + angle;
-    vec3 axis = vec3(0.0, 0.0, 1.0);
-    float s = sin(halfAngle * 0.5);
-    vec4 quaternion = getQuaternionFromAxisAngle(axis, halfAngle);
+    // Apply a quaternion rotation around the Y axis of angle - PI/2
+    vec4 rotation = getQuaternionFromAxisAngle(vec3(0.0, 1.0, 0.0), angle);
 
-    // Adjust for internal rotation (90° around X-axis)
-    float halfAngleX = PI * 0.5;
-    vec3 axisX = vec3(1.0, 0.0, 0.0);
-    vec4 quaternionX = getQuaternionFromAxisAngle(axisX, halfAngleX);
-        
-
-     vec4 finalQuaternion = multiplyQuaternions(quaternion,quaternionX);
+    //apply the queternion rotation to the instance position
     
+
+
     vec3 finalPosition = scaledPosition +
-        2.0 * cross(finalQuaternion.xyz, cross(finalQuaternion.xyz, scaledPosition) + finalQuaternion.w * scaledPosition);
+        2.0 * cross(rotation.xyz, cross(rotation.xyz, scaledPosition) + rotation.w * scaledPosition);;
 
     // Apply instance translation
     vec4 modelPosition = modelMatrix * vec4(instancePosition + finalPosition, 1.0);    
@@ -79,7 +72,6 @@ void main() {
     gl_Position = projectionMatrix * viewPosition;  
 
     vUv=uv;
-    vAlpha=aAlpha;
     vTextureCoords = aTextureCoords;
     vAspectRatio = aAspectRatio;
 }
