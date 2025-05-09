@@ -38,7 +38,6 @@ export default class Canvas {
     this.addEventListeners()
     this.createDebug()
     this.createGallery()
-    //this.createHelpers()
     this.render()
     this.debug.hide()
   }
